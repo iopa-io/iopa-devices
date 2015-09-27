@@ -16,14 +16,13 @@
  
 const constants = require('iopa').constants,
   IOPA = constants.IOPA,
-  SERVER = constants.SERVER,
-  THING = constants.THING
+  SERVER = constants.SERVER
 
-/*onst coapClientSubscriber = require('../middleware/coapClientSubscriber.js')
-  , coapServerAutoAck = require('../middleware/coapServerAutoAck.js')
-  , coapServerPublisher = require('../middleware/coapServerPublisher.js')
-  , iopaMessageConfirmableSend = require('../middleware/iopaMessageConfirmableSend.js')
-*/
+
+const DiscoveryServerIopaWire = require('../middleware/discoveryServerIopaWire.js'),
+      DiscoveryClientIopaWire = require('../middleware/discoveryClientIopaWire.js');
+
+const IopaCbor = require('../middleware/iopaCbor.js');
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -48,6 +47,8 @@ module.exports = function DeviceServer(app) {
     app.properties[SERVER.Capabilities][DEVICESMIDDLEWARE.CAPABILITY] = {};
     app.properties[SERVER.Capabilities][DEVICESMIDDLEWARE.CAPABILITY][SERVER.Version] = packageVersion;
     app.properties[SERVER.Capabilities][DEVICESMIDDLEWARE.CAPABILITY][IOPA.Protocol] = DEVICESMIDDLEWARE.PROTOCOLVERSION;
-
-
+    
+    app.use(IopaCbor);
+    app.use(DiscoveryServerIopaWire);
+    app.use(DiscoveryClientIopaWire);
 }
