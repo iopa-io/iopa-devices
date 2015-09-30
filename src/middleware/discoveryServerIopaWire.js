@@ -29,14 +29,13 @@ const constants = iopa.constants,
 
 var db_Devices = {};
 
-const THISMIDDLEWARE = { CAPABILITY: "urn:io.iopa:device:wire:discovery:server" },
+const THISMIDDLEWARE = { CAPABILITY: "urn:io.iopa:device:wire:discovery:server", UdpServer: "discovery.UdpServer" },
   packageVersion = require('../../package.json').version;
-
 
 const DISCOVERYURL = WIRE.WELLKNOWN[DEVICE.WELLKNOWN.PathBase] + WIRE.WELLKNOWN[DEVICE.WELLKNOWN.Resources];
 const DEVICEURL = WIRE.WELLKNOWN[DEVICE.WELLKNOWN.PathBase] + WIRE.WELLKNOWN[DEVICE.WELLKNOWN.Device];
  
-/**
+ /**
  * CoAP IOPA Middleware for Managing Server Sessions including Auto Subscribing Client Subscribe Requests
  *
  * @class CoAPSubscriptionClient
@@ -45,6 +44,9 @@ const DEVICEURL = WIRE.WELLKNOWN[DEVICE.WELLKNOWN.PathBase] + WIRE.WELLKNOWN[DEV
  * @public
  */
 function DiscoveryServerIopaWire(app) {
+  if (!app.properties[SERVER.Capabilities][IOPA.CAPABILITIES.Udp])
+    throw ("Missing Dependency: UDP Server/Middleware in Pipeline");
+
   if (!app.properties[SERVER.Capabilities][DEVICESMIDDLEWARE.CAPABILITY])
     throw ("Missing Dependency: IOPA Devices Server/Middleware in Pipeline");
 
@@ -58,12 +60,13 @@ function DiscoveryServerIopaWire(app) {
   this.app = app;
   this._devices = {};
   this._factory = new iopa.Factory();
+  this._server = null;
 
   app.device = app.device || {};
   app.device.register = this.register.bind(this, app.device.register || function (device) { return Promise.resolve(device); });
   app.device.unregister = this.register.bind(this, app.device.unregister || function (id) { return Promise.resolve(id); });
 }
- 
+
 /**
 * @method register
 * @this DiscoveryServerIopaWire 
@@ -71,17 +74,42 @@ function DiscoveryServerIopaWire(app) {
 * @param device the device context defaults  
 */
 DiscoveryServerIopaWire.prototype.register = function DiscoveryServerIopaWire_register(nextRegister, device) {
-  if (!(DEVICE.Id in device))
-    throw new Error("device id must be specified");
+ var self = this;
 
-  var id = device[DEVICE.Id];
-  if (!(id in this._devices)) {
-    this._devices[id] = device;
+  return this._ensureListening().then(function () {
+    if (!(DEVICE.Id in device))
+      throw new Error("device id must be specified");
+
+    var id = device[DEVICE.Id];
+    if (!(id in self._devices)) {
+      self._devices[id] = device;
+    }
+    // else silently ignore;
+        
+        
+    return nextRegister(device);
+  });
+}
+
+/**
+* @method _ensureListening
+* @this DiscoveryServerIopaWire 
+*/
+DiscoveryServerIopaWire.prototype._ensureListening = function DiscoveryServerIopaWire_ensureListening() {
+  if (!this._server) {
+    this._server = this.app.getServer("udp:", IOPA.PORTS.COAP);
+
+    if (!this._server) {
+      this._server = this.app.createServer("udp:");
+      return this._server.listen(IOPA.PORTS.COAP, null, {
+        "server.MulticastPort": IOPA.PORTS.COAP,
+        "server.MulticastAddress": iopa.constants.COAP.MULTICASTIPV4
+      });
+    } else return Promise.resolve(null);
   }
-  // else silently ignore;
-     
-  return nextRegister(device);
-} 
+  else
+    return Promise.resolve(null);
+}
 
 /**
  * @method register
@@ -107,6 +135,7 @@ DiscoveryServerIopaWire.prototype.unregister = function DiscoveryServerIopaWire_
  * @param next the next IOPA AppFunc in pipeline 
  */
 DiscoveryServerIopaWire.prototype.invoke = function DiscoveryServerIopaWire_invoke(context, next) {
+  
   if (context[IOPA.Method] !== IOPA.METHODS.GET)
     return next();
 
@@ -130,17 +159,20 @@ DiscoveryServerIopaWire.prototype.invokeDiscover = function DiscoveryServerIopaW
 
   for (var id in this._devices) {
     var device = this._devices[id];
-    var wireItem = toWire(device, [
-      DEVICE.Id,
-      RESOURCE.PathName]);
-    var props = toWire(device, [
-      RESOURCE.Type,
-      RESOURCE.Interface,
-      DEVICE.Policy
-    ]);
-    wireItem[WIRE[RESOURCE.Properties]] = props;
-
-    payload.push(wireItem);
+    var wireItem = toWire(device, [DEVICE.Id]);
+    var resources = [];
+      device[DEVICE.Resources].forEach(function(resource){
+         resources.push(toWire(resource, [
+              RESOURCE.PathName,
+              RESOURCE.Type,
+              RESOURCE.Interface,
+              RESOURCE.Policy,
+              RESOURCE.Name,
+              RESOURCE.TypeName
+            ]));
+      })
+      wireItem[WIRE[DEVICE.Resources]] = resources;
+     payload.push(wireItem);
   }
 
   context.response[IOPA.Body].end(payload);
@@ -205,3 +237,4 @@ function toWire(source, list) {
   });
   return target;
 }
+

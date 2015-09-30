@@ -55,8 +55,8 @@ IopaCbor.prototype.invoke = function IopaCbor_invoke(context, next){
  * @param context iopaCborMIddleware IOPA context dictionary
  * @parm next the next appfunc in pipeline
  */
-IopaCbor.prototype.connect = function IopaCbor_connect(channelContext, next){
-  channelContext[IOPA.Events].on(IOPA.EVENTS.Response, function(responseContext){
+IopaCbor.prototype.dispatch = function IopaCbor_connect(context, next){
+  context[IOPA.Events].on(IOPA.EVENTS.Response, function(responseContext){
      var originalBody = responseContext[IOPA.Body];
      var newBody = new iopaStream.IncomingObjectStream();
       

@@ -14,74 +14,100 @@
  * limitations under the License.
  */
 
+/**
+ * Constants and declarations
+ */
+ 
 global.Promise = require('bluebird');
 
 const iopa = require('iopa'),
-  coap = require('iopa-coap'),
-  udp = require('iopa-udp'),
-  devices = require('./index.js'),
   IOPA = iopa.constants.IOPA,
   SERVER = iopa.constants.SERVER,
   DEVICE = iopa.constants.DEVICE,
   RESOURCE = iopa.constants.RESOURCE,
      packageVersion = require('./package.json').version;
 
-const cbor = require('cbor');
+const IopaUdp =  require('iopa-udp'),
+    IopaCoap = require('iopa-coap'),
+    IopaDevices = require('./index.js')
 
 const iopaMessageLogger = require('iopa-logger').MessageLogger
 
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Demo Device Class
+ */
+   
+function DemoDevice(){
+  var _device = {};
+  _device[DEVICE.ModelManufacturer] = "Internet of Protocols Alliance";
+  _device[DEVICE.ModelManufacturerUrl] = "http://iopa.io";
+  _device[DEVICE.ModelName] = "npm install iopa-devices";
+  _device[DEVICE.ModelNumber] = "iopa-devices";
+  _device[DEVICE.ModelUrl] = "http://github.com/iopa-io/iopa-devices";
+
+  _device[DEVICE.PlatformId] = "LOCALHOST";
+  _device[DEVICE.PlatformName] = "Local Host";
+  _device[DEVICE.PlatformFirmware] = packageVersion;
+  _device[DEVICE.PlatformOS] = require('os').release();
+
+  _device[DEVICE.Id] = "12345-67890";
+  _device[DEVICE.Type] = "urn:io.iopa:demo:devices";
+  _device[DEVICE.Version] = packageVersion;
+  _device[DEVICE.Location] = [37.7833, 122.4167];
+  _device[DEVICE.LocationName] = "San Francisco, USA";
+  _device[DEVICE.Currency] = "USD";
+  _device[DEVICE.Region] = "Home";
+  _device[DEVICE.Policy] = null;
+  _device[DEVICE.Schemes] = ["coap:", "coaps:"];
+  
+  _device[DEVICE.Resources] = [];
+  var _res = {};
+  _res[RESOURCE.TypeName] = "IOPA Demo Projector";
+  _res[RESOURCE.Type] = "urn:io.iopa:resource:projector";
+  _res[RESOURCE.Interface] = "if.switch.binary";
+  _res[RESOURCE.PathName] = "/media/projector";
+  _res[RESOURCE.Name] = "Projector 1";
+  _res[RESOURCE.Value] = false;
+  _device[DEVICE.Resources].push(_res);
+  
+  this._device = _device;
+}
+
+Object.defineProperty(DemoDevice.prototype, "context", { get: function () { return this._device; } })
+Object.defineProperty(DemoDevice.prototype, DEVICE.SystemTime, { get: function () { return new Date().toISOString(); } })
+ 
+
+/**
+ * Main Application Logic
+ */
+ 
 var app = new iopa.App();
 app.use(iopaMessageLogger);
-app.use(coap);
-app.use(devices);
+
+app.use(IopaUdp);
+app.use(IopaCoap);
+app.use(IopaDevices);
 
 app.use(function (context, next) {
   context.log.info("[DEMO] DEVICES APP USE " + context["iopa.Method"] + " " + context["iopa.Path"]);
   return next();
 });
-
-var server = udp.createServer(app.build());
-app.server = server;
  
-var device = {};
-device[DEVICE.ModelManufacturer] = "Internet of Protocols Alliance";
-device[DEVICE.ModelManufacturerUrl] = "http://iopa.io";
-device[DEVICE.ModelName] = "npm install iopa-devices";
-device[DEVICE.ModelNumber] = "iopa-devices";
-device[DEVICE.ModelUrl] = "http://github.com/iopa-io/iopa-devices";
+var device = new DemoDevice();
+var ctx = device.context;
 
-device[DEVICE.PlatformId] = "LOCALHOST";
-device[DEVICE.PlatformName] = "Local Host";
-device[DEVICE.PlatformFirmware] = packageVersion;
-device[DEVICE.PlatformOS] = require('os').release();
+var deviceServer = app.createServer("udp:");
+deviceServer.listen(null, null, {
+              "server.MulticastPort": IOPA.PORTS.COAP, 
+              "server.MulticastAddress": iopa.constants.COAP.MULTICASTIPV4})
+ .then(function(){
+  app.device.register(device.context)
+    .then(function () {
+      return app.device.probe(function(device){
+        console.log(device.toString());
+      });
+    })
+});
 
-device[DEVICE.Id] = "12345-67890";
-device[DEVICE.Type] = "urn:io.iopa:demo:devices";
-device[DEVICE.Version] = packageVersion;
-device[DEVICE.Location] = [37.7833, 122.4167];
-device[DEVICE.LocationName] = "San Francisco, USA";
-device[DEVICE.Currency] = "USD";
-device[DEVICE.Region] = "Home";
-Object.defineProperty(device, DEVICE.SystemTime, { get:  function(){return new Date().toISOString();}})
-device[DEVICE.Policy] = null;
-device[DEVICE.Schemes] = ["coap:", "coaps:"];
-
-device[RESOURCE.TypeName] = "IOPA Demo Projector";
-device[RESOURCE.Type] = "urn:io.iopa:resource:projector";
-device[RESOURCE.Interface] = "if.switch.binary";
-device[RESOURCE.PathName] = "/media/projector";
-device[RESOURCE.Name] = "Projector 1";
-device[RESOURCE.Value] = false;
-app.device.register(device);
-
-if (!process.env.PORT)
-  process.env.PORT = iopa.constants.IOPA.PORTS.COAP;
-var client;
-server.listen(process.env.PORT, process.env.IP)
-  .then(function () {
-    app.log.info("[DEMO] Server is on port " + server.port);
-    return app.device.probe(null, function(device){
-      console.log(device);
-    });
-  })
-  

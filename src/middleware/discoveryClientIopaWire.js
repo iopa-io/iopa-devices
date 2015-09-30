@@ -33,7 +33,6 @@ const constants = iopa.constants,
   const THISMIDDLEWARE = {CAPABILITY: "urn:io.iopa:device:wire:discovery:client"},
     packageVersion = require('../../package.json').version;
      
-     
 const DISCOVERYURL = WIRE.WELLKNOWN[DEVICE.WELLKNOWN.PathBase] + WIRE.WELLKNOWN[DEVICE.WELLKNOWN.Resources];
 const DEVICEURL = WIRE.WELLKNOWN[DEVICE.WELLKNOWN.PathBase] + WIRE.WELLKNOWN[DEVICE.WELLKNOWN.Device];
  
@@ -46,6 +45,9 @@ const DEVICEURL = WIRE.WELLKNOWN[DEVICE.WELLKNOWN.PathBase] + WIRE.WELLKNOWN[DEV
  * @public
  */
 function DiscoveryClientIopaWire(app) {
+  if (!app.properties[SERVER.Capabilities][IOPA.CAPABILITIES.Udp])
+    throw ("Missing Dependency: UDP Server/Middleware in Pipeline");
+  
   if (!app.properties[SERVER.Capabilities][DEVICESMIDDLEWARE.CAPABILITY])
     throw ("Missing Dependency: IOPA Devices Server/Middleware in Pipeline");
 
@@ -63,7 +65,19 @@ function DiscoveryClientIopaWire(app) {
   app.device = app.device || {};
   app.device.probe = this.probe.bind(this, app.device.probe || function(query, cb){return Promise.resolve(null);});
   app.device.resolve = this.resolve.bind(this, app.device.resolve || function(id, cb){return Promise.resolve(null);});
+  
+  this._client = null;
  }
+ 
+ DiscoveryClientIopaWire.prototype._ensureListening = function DiscoveryClientIopaWire_ensureListening() {
+    if (!this._client)
+     {
+       this._client = this.app.createServer("udp:");
+       return this._client.listen();
+     }   
+       else
+       return Promise.resolve(null); 
+}
  
  /**
  * @method probe
@@ -72,18 +86,32 @@ function DiscoveryClientIopaWire(app) {
  * @param device the device context defaults  
  */
 DiscoveryClientIopaWire.prototype.probe = function DiscoveryClientIopaWire_probe(nextProbe, query, cb){
-  var client;
-   this.server = this.app.server;
-   var deviceContext = this._factory._create();
-
-  this.server.connect("coap://127.0.0.1", this.app[SERVER.AppId], false).then(function (cl) {
+  if (typeof query == "function"){
+      cb = query;
+      query = "";
+  }
+  
+  var client, device;
+  var deviceContext = this._factory._create();
+  var self = this;
+  
+  this._ensureListening().then(function(){
+   //   return self._client.connect("coap://" + iopa.constants.COAP.MULTICASTIPV4, self.app[SERVER.AppId], false)
+         return self._client.connect("coap://127.0.0.1" , self.app[SERVER.AppId], false)
+  })
+  .then(function (cl) {
     client = cl;
     return client.send('/.iopa/resources');
   })
   .then(function(response) {
-    var device = fromWire(response[IOPA.Body].read()[0]);
+    deviceContext[SERVER.RemoteAddress] = response[SERVER.RemoteAddress];
+    deviceContext[SERVER.RemotePort] = response [SERVER.RemotePort];
+    device = fromWire(response[IOPA.Body].read()[0]);
     iopa.util.shallow.merge(deviceContext, device);
-    console.log(device);
+       return self._client.connect( "coap://" + deviceContext[SERVER.RemoteAddress] + ":" + deviceContext[SERVER.RemotePort], self.app[SERVER.AppId], false)
+  })
+  .then(function(cl){
+    client = cl;
     return client.send('/.iopa/device?id=' + device[DEVICE.Id]);
   })
   .then(function(response) {
@@ -115,8 +143,37 @@ module.exports = DiscoveryClientIopaWire;
 function fromWire(source){
   var target = {};
   for (var key in source){  
-   if (source.hasOwnProperty(key)  && (source[key] !== null))
+   if ((key !== WIRE[DEVICE.Resources]) && source.hasOwnProperty(key)  && (source[key] !== null))
       target[FROMWIRE[key]] = source[key];
   };
+  
+  if (source.hasOwnProperty(WIRE[DEVICE.Resources]))
+  {
+    var resources = [];
+    source[WIRE[DEVICE.Resources]].forEach(function(res){
+      
+      var targ = {};
+      
+      for (var key in res){  
+        if ((key !== WIRE[RESOURCE.Policy]) && res.hasOwnProperty(key) && (res[key] !== null))
+            targ[FROMWIRE[key]] = res[key];
+      };
+      
+      if (res.hasOwnProperty(WIRE[RESOURCE.Policy]))
+      {
+        var pol = res[WIRE[RESOURCE.Policy]];  var policies = {};
+        for (var key in pol){  
+            if (pol.hasOwnProperty(key)  && (pol[key] !== null))
+              pol[FROMWIRE[key]] = pol[key];
+            };
+        targ[RESOURCE.Policy] = policies;
+      }    
+      
+      resources.push(targ);
+   });
+   
+   target[DEVICE.Resources] = resources;   
+  }
+  
   return target;
 }

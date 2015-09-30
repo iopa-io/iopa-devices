@@ -42,7 +42,7 @@ WIRE[DEVICE.LocationName] = "locationName";
 WIRE[DEVICE.Currency] = "currency";
 WIRE[DEVICE.Region] = "region";
 WIRE[DEVICE.SystemTime] = "systemTime";
-WIRE[DEVICE.Policy] = "policy";
+WIRE[DEVICE.Resources] = "resources";
 WIRE[DEVICE.Schemes] = "schemes";
 
 WIRE[RESOURCE.TypeName] = "resourceTypeName";
@@ -54,6 +54,7 @@ WIRE[RESOURCE.Properties] = "props";
 WIRE[RESOURCE.Value] = "value";
 WIRE[RESOURCE.Parent] = "parent";
 WIRE[RESOURCE.Links] = "links";
+WIRE[RESOURCE.Policy] = "policy";
 
 WIRE.TYPE = {};
 WIRE.TYPE[DEVICE.TYPE.Platform] = "platform";
