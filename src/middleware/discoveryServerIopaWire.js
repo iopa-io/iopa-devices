@@ -15,7 +15,6 @@
  */
 
 const iopa = require('iopa'),
-  cbor = require('cbor'),
   querystring = require('querystring');
 
 const constants = iopa.constants,

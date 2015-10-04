@@ -21,7 +21,9 @@
     "iopa-coap": "^1.3.0",
     "iopa-common-middleware": "^1.3.0",
     "iopa-common-stream": "^1.3.0",
-    "iopa-udp": "^1.3.0"
+    "iopa-udp": "^1.3.0",
+    "iopa-tcp": "^1.3.0",
+    "iopa-http": "^1.3.0"
   },
   "keywords": [
     "iot",

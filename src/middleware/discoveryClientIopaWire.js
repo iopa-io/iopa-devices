@@ -28,6 +28,11 @@ const constants = iopa.constants,
   WIRECAPABILITY = require('../common/constants.js').WIRECAPABILITY,
   DEVICESMIDDLEWARE = require('../common/constants.js').DEVICESMIDDLEWARE
   
+const CACHE = {CAPABILITY: "urn:io.iopa:cache",
+     DONOTCACHE: "cache.DoNotCache",
+     MATCHANYHOST: "cache.MatchAnyHost"
+      }
+  
  var db_Devices = {};
  
   const THISMIDDLEWARE = {CAPABILITY: "urn:io.iopa:device:wire:discovery:client"},
@@ -96,11 +101,12 @@ DiscoveryClientIopaWire.prototype.probe = function DiscoveryClientIopaWire_probe
   var self = this;
   
   this._ensureListening().then(function(){
-   //   return self._client.connect("coap://" + iopa.constants.COAP.MULTICASTIPV4, self.app[SERVER.AppId], false)
-         return self._client.connect("coap://127.0.0.1" , self.app[SERVER.AppId], false)
+      // return self._client.connect("coap://" + iopa.constants.COAP.MULTICASTIPV4, self.app[SERVER.AppId], false)
+         return self._client.connect("coap://127.0.0.1")
   })
   .then(function (cl) {
     client = cl;
+    cl[SERVER.Capabilities][CACHE.CAPABILITY][CACHE.MATCHANYHOST] = true;
     return client.send('/.iopa/resources');
   })
   .then(function(response) {
