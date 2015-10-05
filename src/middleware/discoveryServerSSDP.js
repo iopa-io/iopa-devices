@@ -156,10 +156,8 @@ USN: uuid:12345678-1234-1234-123A-123456789012::urn:schemas-microsoft-com:servic
  * @param next the next IOPA AppFunc in pipeline 
  */
 DiscoveryServerSSDP.prototype.invokeDEVICEGET = function DiscoveryServerSSDP_invokeGET(context, next) {
-   console.log(context[IOPA.Path]);
-    context.response["iopa.Body"].end("<HTML><HEAD></HEAD><BODY>Hello World</BODY>");
- 
-   return Promise.resolve(null);
+  context.response["iopa.Body"].end("<HTML><HEAD></HEAD><BODY>Hello World</BODY>");
+  return Promise.resolve(null);
 }
 
 /**
@@ -173,13 +171,18 @@ DiscoveryServerSSDP.prototype.invokeMSEARCH = function DiscoveryServerSSDP_invok
   for (var id in this._devices) {
     var device = this._devices[id];
       var resource=device[DEVICE.Resources][0];
-      var wireItem = {};
-      wireItem[IOPA.Headers] = {};  
-      wireItem[IOPA.Headers]["S"] = context[IOPA.Headers]["S"];
-      wireItem[IOPA.Headers]["ST"] = resource[RESOURCE.Interface];
-      wireItem[IOPA.Headers]["USN"] = device[DEVICE.Id];
-       wireItem[IOPA.Headers]["LOCATION"] = resource[RESOURCE.PathName];
-      context[SERVER.Capabilities][SSDP.CAPABILITY].respond(wireItem);
+      
+      WireItem.create(context)
+        .set(IOPA.StatusCode, 200)
+        .set(IOPA.ReasonPhrase, "OK")
+        .set(IOPA.Method, null)
+        .set(SERVER.IsRequest, false)
+        .setHeader("S", context.getHeader("S"))
+        .setHeader("ST", resource[RESOURCE.Interface])
+        .setHeader("USN", device[DEVICE.Id])
+        .setHeader("LOCATION", IOPA.SCHEMES.HTTP + "//" + this._HTTPserver[SERVER.LocalAddress] + ":" + this._HTTPserver[SERVER.LocalPort] + SSDP.UPNP_IOPA_WELL_KNOWN + "/" + device[DEVICE.Id] + "/" + SSDP.UPNP_IOPA_DEVICEXML)
+        .setHeader("SERVER", device[DEVICE.PlatformOS] + ", " + SSDP.UPNP_PROTOCOL + ", " + device[DEVICE.PlatformName] + "/" + device[DEVICE.PlatformFirmware])
+       .sendResponse();
   }
   
   return Promise.resolve(true);
@@ -222,22 +225,22 @@ DiscoveryServerSSDP.prototype.register = function DiscoveryServerSSDP_register(n
 DiscoveryServerSSDP.prototype._notify = function DiscoveryServerSSDP_notify(device) {
    
     var wireItem = WireItem.create(this._SSDPclient)
-    .set("NT", SSDP.UPNP_ROOTDEVICE)
-    .set("USN", SSDP.UPNP_UUID + device[DEVICE.Id] + "::" + SSDP.UPNP_ROOTDEVICE)
-    .set("SERVER", device[DEVICE.PlatformOS] + ", " + SSDP.UPNP_PROTOCOL + ", " + device[DEVICE.PlatformName] + "/" + device[DEVICE.PlatformFirmware])
-    .set("LOCATION",  IOPA.SCHEMES.HTTP + "//" + this._HTTPserver[SERVER.LocalAddress] + ":" + this._HTTPserver[SERVER.LocalPort] + SSDP.UPNP_IOPA_WELL_KNOWN + "/" + device[DEVICE.Id] + "/" + SSDP.UPNP_IOPA_DEVICEXML)
+    .setHeader("NT", SSDP.UPNP_ROOTDEVICE)
+    .setHeader("USN", SSDP.UPNP_UUID + device[DEVICE.Id] + "::" + SSDP.UPNP_ROOTDEVICE)
+    .setHeader("SERVER", device[DEVICE.PlatformOS] + ", " + SSDP.UPNP_PROTOCOL + ", " + device[DEVICE.PlatformName] + "/" + device[DEVICE.PlatformFirmware])
+    .setHeader("LOCATION",  IOPA.SCHEMES.HTTP + "//" + this._HTTPserver[SERVER.LocalAddress] + ":" + this._HTTPserver[SERVER.LocalPort] + SSDP.UPNP_IOPA_WELL_KNOWN + "/" + device[DEVICE.Id] + "/" + SSDP.UPNP_IOPA_DEVICEXML)
     .sendAlive()
-    .set("NT", SSDP.UPNP_UUID + device[DEVICE.Id])
-    .set("USN", SSDP.UPNP_UUID + device[DEVICE.Id])
+    .setHeader("NT", SSDP.UPNP_UUID + device[DEVICE.Id])
+    .setHeader("USN", SSDP.UPNP_UUID + device[DEVICE.Id])
     .sendAlive()
-    .set("NT", SSDP.UPNP_DEVICESCHEMA + device[DEVICE.Type])
-    .set("USN", SSDP.UPNP_UUID + device[DEVICE.Id] + "::" + SSDP.UPNP_DEVICESCHEMA + device[DEVICE.Type] )
+    .setHeader("NT", SSDP.UPNP_DEVICESCHEMA + device[DEVICE.Type])
+    .setHeader("USN", SSDP.UPNP_UUID + device[DEVICE.Id] + "::" + SSDP.UPNP_DEVICESCHEMA + device[DEVICE.Type] )
     .sendAlive();
     
     device[DEVICE.Resources].forEach(function(resource){
         wireItem
-         .set("NT", SSDP.UPNP_SERVICESCHEMA + resource[RESOURCE.Type])
-         .set("USN", SSDP.UPNP_UUID + device[DEVICE.Id] + "::" + SSDP.UPNP_SERVICESCHEMA + resource[RESOURCE.Type] )
+         .setHeader("NT", SSDP.UPNP_SERVICESCHEMA + resource[RESOURCE.Type])
+         .setHeader("USN", SSDP.UPNP_UUID + device[DEVICE.Id] + "::" + SSDP.UPNP_SERVICESCHEMA + resource[RESOURCE.Type] )
          .sendAlive()
      })
 }
@@ -256,9 +259,9 @@ DiscoveryServerSSDP.prototype.unregister = function DiscoveryServerSSDP_unregist
  
   var resource=device[DEVICE.Resources][0];
   WireItem.create(this._SSDPclient)
-  .set("ST", resource[RESOURCE.Interface])
-  .set("USN", device[DEVICE.Id])
-  .set("LOCATION",  device[DEVICE.Url])
+  .setHeader("ST", resource[RESOURCE.Interface])
+  .setHeader("USN", device[DEVICE.Id])
+  .setHeader("LOCATION",  device[DEVICE.Url])
   .sendBye()
      
   return nextUnregister(id);
@@ -279,7 +282,7 @@ DiscoveryServerSSDP.prototype._ensureListening = function DiscoveryServerSSDP_en
     this._SSDPserver = this.ssdpApp.createServer("udp:");
     this._HTTPserver = this.httpApp.createServer("tcp:");
     return this._HTTPserver.listen()
-      .then(function (linfo) {console.log(linfo);  
+      .then(function (linfo) {
         that._SSDPserver.listen(0, null, {"server.MulticastPort": (SSDP.PORT), "server.MulticastAddress": SSDP.MULTICASTIPV4});  })
       .then(function () { return that._SSDPserver.connect("ssdp://" + SSDP.MULTICASTIPV4 + ":" + (SSDP.PORT).toString() ) })
       .then(function (client) {  that._SSDPclient = client;  } );
@@ -290,38 +293,47 @@ DiscoveryServerSSDP.prototype._ensureListening = function DiscoveryServerSSDP_en
 
 module.exports = DiscoveryServerSSDP
 
-function WireItem(SSDPclient){
-  this.SSDPclient = SSDPclient;
+function WireItem(transportContext) {
+  this.transportContext = transportContext;
   this.context = {};
   this.context[IOPA.Headers] = {};
 }
 
-WireItem.create = function(SSDPclient){
-    return new WireItem(SSDPclient);
+WireItem.create = function (transportContext) {
+  return new WireItem(transportContext);
 }
 
-WireItem.prototype.set = function(key, value){
-    this.context[IOPA.Headers][key] = value;
-     
+
+WireItem.prototype.set = function (key, value) {
+  this.context[key] = value;
   return this;
 }
 
-WireItem.prototype.sendAlive = function(){
-  this.SSDPclient[SERVER.Capabilities][SSDP.CAPABILITY].alive(this.context);
+WireItem.prototype.setHeader = function (key, value) {
+  this.context[IOPA.Headers][key] = value;
   return this;
 }
 
-WireItem.prototype.sendBye = function(){
-  this.SSDPclient[SERVER.Capabilities][SSDP.CAPABILITY].bye(this.context);
-   return this;
+WireItem.prototype.sendAlive = function () {
+  this.transportContext[SERVER.Capabilities][SSDP.CAPABILITY].alive(this.context);
+  return this;
 }
 
-WireItem.prototype.sendUpdate = function(){
-  this.SSDPclient[SERVER.Capabilities][SSDP.CAPABILITY].update(this.context);
-   return this;
+WireItem.prototype.sendBye = function () {
+  this.transportContext[SERVER.Capabilities][SSDP.CAPABILITY].bye(this.context);
+  return this;
 }
 
-WireItem.prototype.sendSearch = function(){
-  this.SSDPclient[SERVER.Capabilities][SSDP.CAPABILITY].search(this.context);
-   return this;
+WireItem.prototype.sendUpdate = function () {
+  this.transportContext[SERVER.Capabilities][SSDP.CAPABILITY].update(this.context);
+  return this;
+}
+
+WireItem.prototype.sendSearch = function () {
+  this.transportContext[SERVER.Capabilities][SSDP.CAPABILITY].search(this.context);
+  return this;
+}
+
+WireItem.prototype.sendResponse = function () {
+  this.transportContext[SERVER.Capabilities][SSDP.CAPABILITY].respond(this.context);
 }

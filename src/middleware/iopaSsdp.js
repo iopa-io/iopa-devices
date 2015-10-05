@@ -110,7 +110,8 @@ IopaSsdp.prototype.channel = function IopaSsdp_channel(channelContext, next) {
  */
 IopaSsdp.prototype.invoke = function IopaHttp_invoke(context, next) {
     context[SERVER.Capabilities][SSDP.CAPABILITY].respond = IopaSsdp_respond.bind(this, context);
-    context.response[IOPA.Body].once("finish", function(){ IopaSsdp_reply(context); });
+    context.response[IOPA.Body].once("finish", function(){ context.response[SERVER.Dispatch]; });
+    
     return next()
 }
 
@@ -136,28 +137,19 @@ IopaSsdp.prototype.connect = function CoAPClientPacketSend_dispatch(channelConte
  * @param next the next IOPA AppFunc in pipeline 
  */
 IopaSsdp.prototype.dispatch = function IopaSsdp_dispatch(context, next) {
-    return next().then(function () {
+     return next().then(function () {
+        context[HTTP.ShouldKeepAlive] = false;
+        context.setHeader('Host', context.getHeader('Host') ||  SSDP.MULTICASTIPV4 + ":" + SSDP.PORT);
+        context.setHeader('Cache-Control', context.getHeader('Cache-Control') ||   SSDP.MAX_AGE);
         return iopaHttp_outboundWrite(context);
      });
 };
 
 // PRIVATE METHODS
 
-/**
- * Private method to create message defaults for each new packet
- * 
- * @method IopaHttp_messageDefaults
- * @object ctx IOPA context dictionary
- * @private
- */
-function IopaSsdp_messageDefaults(context) { 
-  context[IOPA.Headers]['cache-control'] =  context[IOPA.Headers]['cache-control'] || HTTP.CACHE_CONTROL;
-  context[IOPA.Headers]['server'] =  context[IOPA.Headers]['server'] || HTTP.SERVER;
-};
-
 IopaSsdp.prototype._alive = function (channelContext, values) {
   channelContext[SERVER.Fetch]("*", function(context){
-    context[IOPA.Headers]['NTS'] = SSDP.NOTIFY_TYPES.ALIVE;
+    context.setHeader('NTS', SSDP.NOTIFY_TYPES.ALIVE);
     IopaSsdp_addNotifyHeaders(context);
     iopa.util.shallow.mergeContext(context, values);
   });
@@ -166,14 +158,14 @@ IopaSsdp.prototype._alive = function (channelContext, values) {
 IopaSsdp.prototype._bye = function (channelContext, values) {
   channelContext[SERVER.Fetch]("*", function(context){
     iopa.util.shallow.mergeContext(context, values);
-    context[IOPA.Headers]['NTS'] = SSDP.NOTIFY_TYPES.BYE;
+    context.setHeader('NTS', SSDP.NOTIFY_TYPES.BYE);
     IopaSsdp_addNotifyHeaders(context);
   });
 };
 
 IopaSsdp.prototype._update = function (channelContext, values) {
     channelContext[SERVER.Fetch]("*", function(context){
-    context[IOPA.Headers]['NTS'] = SSDP.NOTIFY_TYPES.UPDATE;
+    context.setHeader('NTS', SSDP.NOTIFY_TYPES.UPDATE)
     iopa.util.shallow.mergeContext(context, values);
     IopaSsdp_addNotifyHeaders(context);
   });
@@ -183,11 +175,8 @@ function IopaSsdp_addNotifyHeaders(context) {
     context[IOPA.Method] = SSDP.METHODS.NOTIFY;
     context[IOPA.Path] = "*";
     context[IOPA.Protocol] = IOPA.PROTOCOLS.HTTP;
-    
-    var headers = context[IOPA.Headers];
-    headers['HOST'] = headers['HOST'] || SSDP.MULTICASTIPV4 + ":" + SSDP.PORT;
-    headers['CACHE-CONTROL'] = headers['CACHE-CONTROL'] || SSDP.MAX_AGE;
- //   headers['DATE'] = headers['DATE'] || new Date().toUTCString();
+    context.setHeader('Host', context.getHeader('Host') ||  SSDP.MULTICASTIPV4 + ":" + SSDP.PORT);
+    context.setHeader('Cache-Control', context.getHeader('Cache-Control') ||   SSDP.MAX_AGE);
 };
 
 IopaSsdp.prototype._search = function (channelContext, values) {
@@ -197,36 +186,10 @@ IopaSsdp.prototype._search = function (channelContext, values) {
     context[IOPA.Protocol] = IOPA.PROTOCOLS.HTTP;
   
     iopa.util.shallow.mergeContext(context, values);
-    var headers = context[IOPA.Headers];
-    headers['HOST'] = headers['HOST'] || SSDP.MULTICASTIPV4 + ":" + SSDP.PORT;
-    headers['MAN'] = SSDP.MAN_TYPES.DISCOVER;
-    headers['MX'] = headers['MX'] || SSDP.MX;
+    context.setHeader('Host', context.getHeader('Host') ||   SSDP.MULTICASTIPV4 + ":" + SSDP.PORT);
+    context.setHeader('MAN', context.getHeader('MAN') ||   SSDP.MAN_TYPES.DISCOVER);
+    context.setHeader('MX', context.getHeader('MX') ||  SSDP.MX);
     });
-
-  return context[SERVER.Fetch]("", function (context) { });
-};
-
-/**
- * Private method to send response packet
- * Triggered on data or finish events
- * 
- * @method _ssdpSendResponse
- * @object ctx IOPA context dictionary
- * @private
- */
-function IopaSsdp_reply(context) {
-  var response = context.response;
-  response[IOPA.Method] = "REPLLLLYYYY";
-
-  response[IOPA.StatusCode] = 200;
-  response[IOPA.ReasonPhrase] = "OK";
-  var headers = response[IOPA.Headers];
-  headers['HOST'] = headers['HOST'] || SSDP.MULTICASTIPV4 + ":" + SSDP.PORT;
-  headers['CACHE-CONTROL'] = headers['CACHE-CONTROL'] || SSDP.MAX_AGE;
-  headers['EXT'] = headers['EXT'] || "";
-  headers['DATE'] = headers['DATE'] || new Date().toUTCString();
-
-  iopaHttp_outboundWrite(context.response);
 };
  
  /**
@@ -239,16 +202,10 @@ function IopaSsdp_reply(context) {
  */
 function IopaSsdp_respond(originalContext, values) {
    originalContext[SERVER.Fetch]("", function(context){
-      context[IOPA.Method] = "234234234234";
-      context[IOPA.StatusCode] = 200;
-      context[IOPA.ReasonPhrase] = "OK";
-      var headers = context[IOPA.Headers];
-      context['HOST'] = headers['HOST'] || SSDP.MULTICASTIPV4 + ":" + SSDP.PORT;
-      context['CACHE-CONTROL'] = headers['CACHE-CONTROL'] || SSDP.MAX_AGE;
-      context['EXT'] = headers['EXT'] || "";
-      context['DATE'] = headers['DATE'] || new Date().toUTCString();
-      
-      iopa.util.shallow.mergeContext(context, values);
+        context[IOPA.Protocol] = IOPA.PROTOCOLS.HTTP;
+        context.setHeader('EXT',"");
+        context.setHeader('Cache-Control',  SSDP.MAX_AGE);
+        iopa.util.shallow.mergeContext(context, values);
    });
  };
  
