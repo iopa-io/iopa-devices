@@ -32,8 +32,9 @@ const IopaUdp =  require('iopa-udp'),
       IopaTcp = require('iopa-tcp'),
       IopaHttp = require('iopa-http'),
     IopaDevices = require('./index.js'),
-    IopaDiscoverySSDP = require('./src/middleware/discoveryServerSSDP.js')
-  
+    IopaDiscoveryServerSSDP = require('./src/middleware/discoveryServerSSDP.js'),
+   IopaDiscoveryClientSSDP = require('./src/middleware/discoveryClientSSDP.js')
+   
 const iopaMessageLogger = require('iopa-logger').MessageLogger
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -89,7 +90,8 @@ Object.defineProperty(DemoDevice.prototype, DEVICE.SystemTime, { get: function (
 var app = new iopa.App();
 app.use(IopaUdp);
 app.use(IopaTcp);
-app.use(IopaDiscoverySSDP);
+app.use(IopaDiscoveryServerSSDP);
+app.use(IopaDiscoveryClientSSDP);
 //app.use(iopaMessageLogger);
 
 /*
@@ -107,6 +109,13 @@ var device = new DemoDevice();
 var ctx = device.context;
 
  app.device.register(device.context)
+ 
+ setTimeout(function(){
+   
+ app.device.probe("upnp:rootdevice", function(device){
+        console.log(device.toString());
+      });}, 2000);
+      
   /*  .then(function () {
       return app.device.probe(function(device){
         console.log(device.toString());

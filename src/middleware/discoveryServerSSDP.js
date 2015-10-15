@@ -41,7 +41,7 @@ const SSDP = {
   CAPABILITY: "urn:io.iopa:ssdp",
   SCHEME: "ssdp:",
   MULTICASTIPV4: '239.255.255.250',
-  PORT: 1900,
+  PORT: 1901,
   MAX_AGE: "max-age=1800",
   TTL: 128,
   MX: 2,
@@ -92,7 +92,7 @@ function DiscoveryServerSSDP(app) {
   this.ssdpApp = new iopa.App();
   this.ssdpApp.use(IopaUDP);
   this.ssdpApp.use(IopaSSDP);
-    this.ssdpApp.use(IopaMessageLogger);
+  this.ssdpApp.use(IopaMessageLogger);
 
   this.ssdpApp.use(this.invoke.bind(this));
   
@@ -171,8 +171,7 @@ DiscoveryServerSSDP.prototype.invokeMSEARCH = function DiscoveryServerSSDP_invok
   for (var id in this._devices) {
     var device = this._devices[id];
       var resource=device[DEVICE.Resources][0];
-      
-      WireItem.create(context)
+       WireItem.create(context)
         .set(IOPA.StatusCode, 200)
         .set(IOPA.ReasonPhrase, "OK")
         .set(IOPA.Method, null)
@@ -326,11 +325,6 @@ WireItem.prototype.sendBye = function () {
 
 WireItem.prototype.sendUpdate = function () {
   this.transportContext[SERVER.Capabilities][SSDP.CAPABILITY].update(this.context);
-  return this;
-}
-
-WireItem.prototype.sendSearch = function () {
-  this.transportContext[SERVER.Capabilities][SSDP.CAPABILITY].search(this.context);
   return this;
 }
 
