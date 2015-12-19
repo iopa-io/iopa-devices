@@ -17,13 +17,14 @@
 const constants = require('iopa').constants,
   IOPA = constants.IOPA,
   SERVER = constants.SERVER,
-  COAP = constants.COAP,
+  THING = constants.THING,
   SESSION = require('../common/constants.js').COAPSESSION,
-  COAPMIDDLEWARE = require('../common/constants.js').COAPMIDDLEWARE
+  WIREMIDDLEWARE = require('../common/constants.js').WIRE
   
  var db_Clients = {};
  
- const THISMIDDLEWARE = {CAPABILITY: "urn:io.iopa:coap:clientsubscriber"},
+ const DEVICESMIDDLEWARE = {CAPABILITY: "urn:io.iopa:devices", PROTOCOLVERSION: "1.0"},
+  THISMIDDLEWARE = {CAPABILITY: "urn:io.iopa:devices:wire:discovery:server"},
      packageVersion = require('../../package.json').version;
  
 /**
@@ -34,9 +35,9 @@ const constants = require('iopa').constants,
  * @constructor
  * @public
  */
-function CoAPClientSubscriber(app) {
-  if (!app.properties[SERVER.Capabilities][COAPMIDDLEWARE.CAPABILITY])
-    throw ("Missing Dependency: IOPA CoAP Server/Middleware in Pipeline");
+function CoapDiscoveryServer(app) {
+  if (!app.properties[SERVER.Capabilities][DEVICESMIDDLEWARE.CAPABILITY])
+    throw ("Missing Dependency: IOPA DEVICES Server/Middleware in Pipeline");
 
   app.properties[SERVER.Capabilities][THISMIDDLEWARE.CAPABILITY] = {};
   app.properties[SERVER.Capabilities][THISMIDDLEWARE.CAPABILITY][SERVER.Version] = packageVersion;
